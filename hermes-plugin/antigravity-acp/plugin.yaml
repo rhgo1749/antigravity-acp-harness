@@ -1,0 +1,5 @@
+name: antigravity-acp-provider
+kind: model-provider
+version: 0.1.0
+description: Google Antigravity through Google's official ACP server
+author: rhgo1749
