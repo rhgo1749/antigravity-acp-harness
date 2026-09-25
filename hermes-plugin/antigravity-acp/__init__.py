@@ -46,10 +46,18 @@ antigravity_acp = AntigravityACPProfile(
     base_url="acp://antigravity",
     auth_type="external_process",
     process_command="antigravity-acp-official",
-    process_args=(),
+    # MUST be non-empty: CopilotACPClient treats falsy args as "use the default
+    # --acp --stdio", which the official par rejects (FATAL Flags parsing error:
+    # Unknown command line flag 'acp'). fetch_models() swallows that failure and
+    # the picker silently shows only fallback_models instead of the live
+    # configOptions catalog. "--uid=" is the arg the official wrapper itself uses.
+    process_args=("--uid=",),
     process_command_env_vars=("HERMES_ANTIGRAVITY_ACP_COMMAND",),
     process_args_env_var="HERMES_ANTIGRAVITY_ACP_ARGS",
-    fallback_models=("antigravity-acp",),
+    # No stub fallback: "antigravity-acp" is a transport label, not a model.
+    # When the live ACP session cannot list models, show nothing rather than a
+    # phantom entry that fails on first use.
+    fallback_models=(),
 )
 
 register_provider(antigravity_acp)
