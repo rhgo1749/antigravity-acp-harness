@@ -95,6 +95,43 @@ The plugin expects `antigravity-acp-official` on `PATH`, or set the command thro
 
 This plugin deliberately keeps **Hermes tools in Hermes**. It does not grant the Antigravity runtime arbitrary native tool permissions when acting as a Hermes model backend. If you want the full Antigravity agent runtime with its native tools and MCP clients, connect the official server as an external ACP **agent**, not as a Hermes model-provider shim.
 
+## Multi-account multiplexer (optional)
+
+`scripts/acp_mux.py` presents **one** ACP endpoint backed by **several** Google accounts. A client spawns the mux instead of the official launcher; per spawn (i.e. per client session) the mux:
+
+1. reads an account registry (JSON, hot-reloaded — add/remove accounts by editing the file only),
+2. queries each account's live quota via the read-only `retrieveUserQuotaSummary` endpoint (results cached ~60s),
+3. binds the session to the account with the best remaining quota (minimum `remainingFraction` across all windows; ties broken by registry priority), spawning the official `agy_acp_server.par` under that account's `HOME` and relaying JSON-RPC both ways.
+
+```bash
+cp examples/acp-accounts.example.json ~/.hermes/acp-accounts.json   # edit accounts
+ACP_MUX_PAR=~/.local/opt/antigravity-acp/<version>/agy_acp_server.par \
+  python3 scripts/acp_mux.py --uid=
+```
+
+Accounts are isolated purely by `HOME`: each account's own
+`$HOME/.gemini/antigravity-acp/acp_token.json` is created by the **official
+server's own OAuth flow** (spawn it with `HOME=<account home>`, call ACP
+`authenticate` with `oauth-personal`, complete the consent in a browser). The
+mux never writes, copies, or mints OAuth tokens; it reads the credential the
+official server already owns solely to call the read-only quota endpoint.
+Tokens stay in process memory: the relay stderr is redacted and the selection
+log records account labels and scores only.
+
+Point a Hermes provider profile's `process_command` at a small wrapper that
+exports `ACP_MUX_PAR` and execs `python3 scripts/acp_mux.py` to use it as a
+model backend.
+
+Degradation order: quota-scoreable accounts > credential-usable accounts by
+priority > default `HOME`. Accounts failing auth get a 5-minute penalty so a
+revoked account does not slow every spawn. Account selection happens at
+session start; in-session failover on a mid-session 429 is not implemented.
+
+Note: when accounts authenticate with personal Antigravity OAuth, the terms
+caveat above applies to the multiplexer exactly as it does to any third-party
+harness — see "Important: personal Antigravity OAuth and third-party
+harnesses".
+
 ## What this repository is not
 
 - Not an OAuth extractor.
