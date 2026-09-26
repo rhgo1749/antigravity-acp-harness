@@ -114,6 +114,8 @@ ACP_MUX_PAR=~/.local/opt/antigravity-acp/<version>/agy_acp_server.par \
 
 Accounts are isolated purely by `HOME`. Authentication and credential storage are owned by the **official** server running under each account HOME; the mux never opens those credentials. Relay stderr is redacted, and the routing state records only account labels/HOMEs, cooldown timestamps, failure classes, and a round-robin cursor.
 
+When the parent harness isolates subprocess `HOME` per profile, the mux keeps its control-plane paths separate from that isolation. Default registry/state/log paths resolve from `ACP_MUX_HOME`, then `HERMES_REAL_HOME`, then `HOME`. Hermes already exports `HERMES_REAL_HOME` for profile-scoped subprocesses, so all profiles can share one account registry without machine-specific hardcoded paths. `ACP_MUX_ACCOUNTS`, `ACP_MUX_STATE`, and `ACP_MUX_LOG` remain the highest-priority per-path overrides.
+
 Point a Hermes provider profile's `process_command` at a small wrapper that
 exports `ACP_MUX_PAR` and execs `python3 scripts/acp_mux.py` to use it as a
 model backend.

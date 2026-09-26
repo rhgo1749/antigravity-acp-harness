@@ -94,6 +94,27 @@ def test_rate_limit_retry_reopens_session_until_success(monkeypatch) -> None:
     assert FakeClient.calls == 3
 
 
+def test_auth_error_reopens_session_until_success(monkeypatch) -> None:
+    class FakeClient:
+        calls = 0
+
+        def __init__(self, **kwargs):
+            pass
+
+        def _run_prompt(self, prompt_text, *, timeout_seconds, model=None):
+            FakeClient.calls += 1
+            if FakeClient.calls == 1:
+                raise RuntimeError("ACP session/new failed: Authentication required")
+            return "ok", ""
+
+    monkeypatch.delenv("HERMES_ANTIGRAVITY_ACP_RATE_LIMIT_RETRIES", raising=False)
+    module = _load_plugin(monkeypatch, FakeClient)
+    client = module.antigravity_acp.create_client()
+
+    assert client._run_prompt("hello", timeout_seconds=10) == ("ok", "")
+    assert FakeClient.calls == 2
+
+
 def test_non_rate_limit_error_is_not_retried(monkeypatch) -> None:
     class FakeClient:
         calls = 0

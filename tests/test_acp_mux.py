@@ -46,6 +46,19 @@ def test_no_registry_falls_back_to_default_home(env):
     assert label == "default"
 
 
+def test_control_home_prefers_explicit_then_hermes_real_home():
+    assert acp_mux._control_home({
+        "ACP_MUX_HOME": "/mux-control",
+        "HERMES_REAL_HOME": "/real-home",
+        "HOME": "/profile-home",
+    }) == "/mux-control"
+    assert acp_mux._control_home({
+        "HERMES_REAL_HOME": "/real-home",
+        "HOME": "/profile-home",
+    }) == "/real-home"
+    assert acp_mux._control_home({"HOME": "/profile-home"}) == "/profile-home"
+
+
 def test_round_robin_within_same_priority_tier(env):
     a = str(env / "a")
     b = str(env / "b")

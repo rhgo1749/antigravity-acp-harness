@@ -18,6 +18,12 @@ _RATE_LIMIT_RE = re.compile(
     r"quota(?:\s+(?:exceeded|exhausted|depleted|reached|unavailable)))",
     re.IGNORECASE,
 )
+_AUTH_RE = re.compile(
+    r"(?:\b401\b|\b403\b|unauthenticated|invalid[_ -]?grant|"
+    r"authentication\s+(?:failed|failure|required)|authorization\s+(?:failed|failure)|"
+    r"(?:access|refresh|id)?\s*token\s+(?:expired|revoked|invalid))",
+    re.IGNORECASE,
+)
 _DEFAULT_RATE_LIMIT_RETRIES = 2
 _MAX_RATE_LIMIT_RETRIES = 8
 
@@ -34,8 +40,8 @@ def _rate_limit_retries() -> int:
     return max(0, min(value, _MAX_RATE_LIMIT_RETRIES))
 
 
-def _is_rate_limit_error(exc: BaseException) -> bool:
-    return bool(_RATE_LIMIT_RE.search(str(exc)))
+def _is_failover_error(exc: BaseException) -> bool:
+    return bool(_RATE_LIMIT_RE.search(str(exc)) or _AUTH_RE.search(str(exc)))
 
 
 class AntigravityACPProfile(ProviderProfile):
@@ -67,11 +73,11 @@ class AntigravityACPProfile(ProviderProfile):
                             model=model,
                         )
                     except RuntimeError as exc:
-                        if attempt >= retries or not _is_rate_limit_error(exc):
+                        if attempt >= retries or not _is_failover_error(exc):
                             raise
                         last_exc = exc
                         logger.warning(
-                            "Antigravity ACP rate-limited attempt %d/%d; retrying with a fresh ACP session.",
+                            "Antigravity ACP failover attempt %d/%d; retrying with a fresh ACP session.",
                             attempt + 1,
                             retries + 1,
                         )

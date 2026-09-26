@@ -21,6 +21,8 @@ cooling down, the account whose cooldown expires first is probed so the mux
 never turns a stale health record into a hard outage.
 
 Environment:
+  ACP_MUX_HOME            shared mux control home; defaults to HERMES_REAL_HOME,
+                          then HOME. Used only for default registry/state/log paths.
   ACP_MUX_ACCOUNTS        registry path (default ~/.hermes/acp-accounts.json)
   ACP_MUX_PAR             official agy_acp_server.par path (required)
   ACP_MUX_STATE           routing/health state (default ~/.hermes/cache/acp-mux-state.json)
@@ -59,17 +61,48 @@ def _env(primary: str, fallback: str | None, default: str) -> str:
     return value if value is not None else default
 
 
+def _control_home(env: dict[str, str] | None = None) -> str:
+    """Shared mux control home, independent from an isolated subprocess HOME.
+
+    Hermes intentionally rewrites ``HOME`` for profile-scoped subprocesses and
+    publishes the OS-user home as ``HERMES_REAL_HOME``. The mux account
+    registry and health state are host-level control-plane data, so their
+    defaults should follow the real home while the selected ACP child still
+    receives the account-specific HOME below.
+
+    ``ACP_MUX_HOME`` is the explicit portable override for non-Hermes hosts.
+    """
+    values = os.environ if env is None else env
+    raw = (
+        values.get("ACP_MUX_HOME")
+        or values.get("HERMES_REAL_HOME")
+        or values.get("HOME")
+        or os.path.expanduser("~")
+    )
+    return os.path.expanduser(raw)
+
+
+def _default_control_path(relative: str, env: dict[str, str] | None = None) -> str:
+    return os.path.join(_control_home(env), ".hermes", relative)
+
+
 REGISTRY_PATH = os.path.expanduser(
-    _env("ACP_MUX_ACCOUNTS", "HERMES_ACP_ACCOUNTS", "~/.hermes/acp-accounts.json")
+    _env(
+        "ACP_MUX_ACCOUNTS",
+        "HERMES_ACP_ACCOUNTS",
+        _default_control_path("acp-accounts.json"),
+    )
 )
 STATE_PATH = os.path.expanduser(
     _env(
         "ACP_MUX_STATE",
         "ACP_MUX_CACHE",
-        "~/.hermes/cache/acp-mux-state.json",
+        _default_control_path("cache/acp-mux-state.json"),
     )
 )
-LOG_PATH = os.path.expanduser(os.environ.get("ACP_MUX_LOG", "~/.hermes/logs/acp-mux.log"))
+LOG_PATH = os.path.expanduser(
+    os.environ.get("ACP_MUX_LOG", _default_control_path("logs/acp-mux.log"))
+)
 PAR = _env("ACP_MUX_PAR", "HERMES_ANTIGRAVITY_ACP_PAR", "")
 DEFAULT_HOME = os.environ.get("HOME", os.path.expanduser("~"))
 
