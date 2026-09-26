@@ -116,9 +116,7 @@ Accounts are isolated purely by `HOME`. Authentication and credential storage ar
 
 When the parent harness isolates subprocess `HOME` per profile, the mux keeps its control-plane paths separate from that isolation. Default registry/state/log paths resolve from `ACP_MUX_HOME`, then `HERMES_REAL_HOME`, then `HOME`. Hermes already exports `HERMES_REAL_HOME` for profile-scoped subprocesses, so all profiles can share one account registry without machine-specific hardcoded paths. `ACP_MUX_ACCOUNTS`, `ACP_MUX_STATE`, and `ACP_MUX_LOG` remain the highest-priority per-path overrides.
 
-Point a Hermes provider profile's `process_command` at a small wrapper that
-exports `ACP_MUX_PAR` and execs `python3 scripts/acp_mux.py` to use it as a
-model backend.
+The bundled `scripts/antigravity-acp-mux` wrapper is portable: it resolves the Python mux beside itself, honors `ACP_MUX_PAR` / `HERMES_ANTIGRAVITY_ACP_PAR` when explicitly configured, and otherwise discovers `antigravity-acp-official` from `PATH`. Point a Hermes provider profile's `process_command` at an installed copy of that wrapper to use it as a model backend without machine-specific paths.
 
 Accounts with the same numeric `priority` form a round-robin pool. Lower numbers are preferred tiers, so set all accounts to the same priority when you want even distribution; use different priorities when you want primary/fallback behavior.
 

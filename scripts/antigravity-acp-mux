@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+self_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+python_cmd=${PYTHON:-python3}
+
+if [ -z "${ACP_MUX_PAR:-}" ]; then
+    if [ -n "${HERMES_ANTIGRAVITY_ACP_PAR:-}" ]; then
+        ACP_MUX_PAR=$HERMES_ANTIGRAVITY_ACP_PAR
+    else
+        ACP_MUX_PAR=$(command -v antigravity-acp-official || true)
+    fi
+fi
+
+if [ -z "${ACP_MUX_PAR:-}" ]; then
+    echo "antigravity-acp-mux: set ACP_MUX_PAR or install antigravity-acp-official on PATH" >&2
+    exit 2
+fi
+
+export ACP_MUX_PAR
+exec "$python_cmd" "$self_dir/antigravity-acp-mux.py" "$@"
