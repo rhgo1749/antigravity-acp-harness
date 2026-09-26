@@ -104,7 +104,7 @@ LOG_PATH = os.path.expanduser(
     os.environ.get("ACP_MUX_LOG", _default_control_path("logs/acp-mux.log"))
 )
 PAR = _env("ACP_MUX_PAR", "HERMES_ANTIGRAVITY_ACP_PAR", "")
-DEFAULT_HOME = os.environ.get("HOME", os.path.expanduser("~"))
+DEFAULT_HOME = _control_home()
 
 AUTH_COOLDOWN = float(os.environ.get("ACP_MUX_AUTH_COOLDOWN", "300"))
 QUOTA_COOLDOWN = float(os.environ.get("ACP_MUX_QUOTA_COOLDOWN", "900"))

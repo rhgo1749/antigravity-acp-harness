@@ -59,6 +59,38 @@ def test_control_home_prefers_explicit_then_hermes_real_home():
     assert acp_mux._control_home({"HOME": "/profile-home"}) == "/profile-home"
 
 
+def test_imported_default_home_uses_hermes_real_home(tmp_path):
+    real_home = tmp_path / "real-home"
+    profile_home = tmp_path / "profile-home"
+    real_home.mkdir()
+    profile_home.mkdir()
+    proc_env = os.environ.copy()
+    proc_env.update({
+        "HOME": str(profile_home),
+        "HERMES_REAL_HOME": str(real_home),
+    })
+    proc_env.pop("ACP_MUX_HOME", None)
+    module_path = ROOT / "scripts" / "acp_mux.py"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import importlib.util; "
+                f"s=importlib.util.spec_from_file_location('m',{str(module_path)!r}); "
+                "m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(m.DEFAULT_HOME)"
+            ),
+        ],
+        text=True,
+        capture_output=True,
+        env=proc_env,
+        timeout=10,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.strip() == str(real_home)
+
+
 def test_round_robin_within_same_priority_tier(env):
     a = str(env / "a")
     b = str(env / "b")
