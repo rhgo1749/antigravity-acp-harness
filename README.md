@@ -122,7 +122,7 @@ Accounts with the same numeric `priority` form a round-robin pool. Lower numbers
 
 Observed failures affect future sessions: auth failures default to a 5-minute cooldown, quota/rate-limit failures to 15 minutes, and unexpected child-process failures to 1 minute. These durations are configurable with `ACP_MUX_AUTH_COOLDOWN`, `ACP_MUX_QUOTA_COOLDOWN`, and `ACP_MUX_CRASH_COOLDOWN`. If every account is cooling down, the mux probes the account whose cooldown expires first rather than creating a hard outage from stale health state.
 
-Account selection happens at session start. The mux intentionally does not replay a partially established ACP session on another account after a mid-session failure; implementing safe session replay would require reconstructing ACP session state rather than blindly resending a prompt.
+The bundled Hermes provider adds bounded **same-request failover** for rate-limit/quota errors. Hermes already creates a fresh ACP process/session for each completion and resends the full conversation transcript, so when account A returns `429` / `RESOURCE_EXHAUSTED`, the mux quarantines A and the provider retries that same completion through a fresh mux process. With the default `HERMES_ANTIGRAVITY_ACP_RATE_LIMIT_RETRIES=2`, up to three accounts can be tried within the original completion timeout budget. Set the environment variable to `0` to disable retry or to another bounded value (maximum 8) for a larger pool.
 
 Note: when accounts authenticate with personal Antigravity OAuth, the terms
 caveat above applies to the multiplexer exactly as it does to any third-party
