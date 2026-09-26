@@ -100,8 +100,11 @@ This plugin deliberately keeps **Hermes tools in Hermes**. It does not grant the
 `scripts/acp_mux.py` presents **one** ACP endpoint backed by **several** Google accounts. A client spawns the mux instead of the official launcher; per spawn (i.e. per client session) the mux:
 
 1. reads an account registry (JSON, hot-reloaded — add/remove accounts by editing the file only),
-2. queries each account's live quota via the read-only `retrieveUserQuotaSummary` endpoint (results cached ~60s),
-3. binds the session to the account with the best remaining quota (minimum `remainingFraction` across all windows; ties broken by registry priority), spawning the official `agy_acp_server.par` under that account's `HOME` and relaying JSON-RPC both ways.
+2. chooses the first priority tier that has a healthy account and round-robins within that tier,
+3. spawns the official `agy_acp_server.par` under the selected account's `HOME` and relays ACP JSON-RPC unchanged,
+4. observes explicit auth, quota/rate-limit, and child-process failures and quarantines that account for future sessions.
+
+The mux does **not** read Antigravity credential files, exchange refresh tokens, or call Google private/internal quota APIs. Vendor authentication stays inside Google's official ACP process.
 
 ```bash
 cp examples/acp-accounts.example.json ~/.hermes/acp-accounts.json   # edit accounts
@@ -109,23 +112,17 @@ ACP_MUX_PAR=~/.local/opt/antigravity-acp/<version>/agy_acp_server.par \
   python3 scripts/acp_mux.py --uid=
 ```
 
-Accounts are isolated purely by `HOME`: each account's own
-`$HOME/.gemini/antigravity-acp/acp_token.json` is created by the **official
-server's own OAuth flow** (spawn it with `HOME=<account home>`, call ACP
-`authenticate` with `oauth-personal`, complete the consent in a browser). The
-mux never writes, copies, or mints OAuth tokens; it reads the credential the
-official server already owns solely to call the read-only quota endpoint.
-Tokens stay in process memory: the relay stderr is redacted and the selection
-log records account labels and scores only.
+Accounts are isolated purely by `HOME`. Authentication and credential storage are owned by the **official** server running under each account HOME; the mux never opens those credentials. Relay stderr is redacted, and the routing state records only account labels/HOMEs, cooldown timestamps, failure classes, and a round-robin cursor.
 
 Point a Hermes provider profile's `process_command` at a small wrapper that
 exports `ACP_MUX_PAR` and execs `python3 scripts/acp_mux.py` to use it as a
 model backend.
 
-Degradation order: quota-scoreable accounts > credential-usable accounts by
-priority > default `HOME`. Accounts failing auth get a 5-minute penalty so a
-revoked account does not slow every spawn. Account selection happens at
-session start; in-session failover on a mid-session 429 is not implemented.
+Accounts with the same numeric `priority` form a round-robin pool. Lower numbers are preferred tiers, so set all accounts to the same priority when you want even distribution; use different priorities when you want primary/fallback behavior.
+
+Observed failures affect future sessions: auth failures default to a 5-minute cooldown, quota/rate-limit failures to 15 minutes, and unexpected child-process failures to 1 minute. These durations are configurable with `ACP_MUX_AUTH_COOLDOWN`, `ACP_MUX_QUOTA_COOLDOWN`, and `ACP_MUX_CRASH_COOLDOWN`. If every account is cooling down, the mux probes the account whose cooldown expires first rather than creating a hard outage from stale health state.
+
+Account selection happens at session start. The mux intentionally does not replay a partially established ACP session on another account after a mid-session failure; implementing safe session replay would require reconstructing ACP session state rather than blindly resending a prompt.
 
 Note: when accounts authenticate with personal Antigravity OAuth, the terms
 caveat above applies to the multiplexer exactly as it does to any third-party
